@@ -109,6 +109,7 @@ class TrayManager {
   }
 
   startSync() {
+    if (this.isRunning) return;
     this.isRunning = true;
     this.onStart();
 
@@ -131,6 +132,7 @@ class TrayManager {
   }
 
   stopSync() {
+    if (!this.isRunning) return;
     this.isRunning = false;
     this.onStop();
 

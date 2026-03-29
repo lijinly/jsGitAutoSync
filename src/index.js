@@ -141,6 +141,8 @@ function stopSync() {
   watcher.stop();
   syncer.stop();
   logger.info('⏸️ 同步已停止');
+  // Note: tray.stopSync() is called from the tray click handler, not here
+  // to avoid circular calls
 }
 
 function uninstallService() {
@@ -175,12 +177,14 @@ tray.create({
   },
 });
 
-// 自动启动同步
+// 自动启动同步 - 立即启动并更新托盘为绿色
 startSync().then(() => {
-  // After auto-start, update tray to running state
-  if (isRunning && tray.systray) {
-    tray.startSync();
-  }
+  // Wait a bit for tray to be ready, then update to running state
+  setTimeout(() => {
+    if (isRunning && tray.systray) {
+      tray.startSync();
+    }
+  }, 1000);
 });
 
 // 优雅退出
