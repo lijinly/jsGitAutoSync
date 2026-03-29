@@ -34,11 +34,10 @@ echo.
 
 echo [3/5] Copying configuration files...
 copy .env.example release\.env.example >nul
-copy service-install.bat release\ >nul
-copy service-uninstall.bat release\ >nul
 copy setup.bat release\ >nul
 copy uninstall.bat release\ >nul
 copy README.md release\ >nul
+copy QUICKSTART.md release\ >nul
 copy DISTRIBUTION.md release\ >nul
 echo.
 
