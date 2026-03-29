@@ -4,10 +4,18 @@ echo GitFileSync - Create Release Package
 echo ========================================
 echo.
 
+REM Set pkg cache path for faster builds
+set PKG_CACHE_PATH=C:\pkg-cache
+if not exist %PKG_CACHE_PATH% (
+    mkdir %PKG_CACHE_PATH%
+    echo Created cache directory: %PKG_CACHE_PATH%
+)
+
 REM Check Node.js
 where node >nul 2>&1
 if %errorLevel% neq 0 (
     echo Error: Node.js not found!
+    echo Please install Node.js 18+ from https://nodejs.org/
     pause
     exit /b 1
 )
@@ -21,10 +29,42 @@ if %errorLevel% neq 0 (
 )
 echo.
 
-echo [2/5] Building executable...
+echo [2/5] Checking Node.js binaries for pkg...
+set NODE_BINARY=fetched-v18.15.0-win-x64
+set DOWNLOAD_URL=https://github.com/vercel/pkg-fetch/releases/download/v3.5/node-v18.15.0-win-x64
+
+if exist %PKG_CACHE_PATH%\%NODE_BINARY% (
+    echo Binary found in cache. Build will be fast!
+) else if exist .\pkg-cache\%NODE_BINARY% (
+    echo Found local binary, copying to cache...
+    if not exist %PKG_CACHE_PATH% mkdir %PKG_CACHE_PATH%
+    copy .\pkg-cache\%NODE_BINARY% %PKG_CACHE_PATH%\%NODE_BINARY% >nul
+    echo Local binary copied to cache.
+) else (
+    echo Binary not found. Downloading from GitHub... (one-time only)
+    echo URL: %DOWNLOAD_URL%
+    echo This may take 5-10 minutes depending on your internet speed.
+    echo.
+    powershell -Command "& {$url='%DOWNLOAD_URL%'; $out='%PKG_CACHE_PATH%\%NODE_BINARY%'; try { Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing; Write-Host 'Download complete!'} catch { Write-Host 'Download failed: ' $_.Exception.Message; exit 1 }}"
+    if %errorLevel% neq 0 (
+        echo.
+        echo Error: Download failed!
+        echo Please manually download from: %DOWNLOAD_URL%
+        echo And place it at: %PKG_CACHE_PATH%\%NODE_BINARY%
+        pause
+        exit /b 1
+    )
+    echo Download complete!
+)
+echo.
+
+echo [3/5] Building executable...
 if exist release rmdir /s /q release
 mkdir release
-npx pkg . --targets node18-win-x64 --output release/AGitFileSync.exe
+
+REM Build with pkg (uses cache for fast builds)
+npx pkg . --targets node18.15.0-win-x64 --output release/AGitFileSync.exe
+
 if %errorLevel% neq 0 (
     echo Error: Build failed!
     pause
@@ -32,7 +72,7 @@ if %errorLevel% neq 0 (
 )
 echo.
 
-echo [3/5] Copying configuration files...
+echo [4/5] Copying configuration files...
 copy .env.example release\.env.example >nul
 copy setup.bat release\ >nul
 copy uninstall.bat release\ >nul
@@ -41,61 +81,10 @@ copy QUICKSTART.md release\ >nul
 copy DISTRIBUTION.md release\ >nul
 echo.
 
-echo [4/5] Creating logs directory...
+echo [5/5] Creating logs directory...
 mkdir release\logs 2>nul
 echo.
 
-echo [5/5] Creating installation script...
-(
-echo @echo off
-echo echo ========================================
-echo echo GitFileSync - Quick Install
-echo echo ========================================
-echo echo.
-echo echo This will install GitFileSync as a Windows Service.
-echo echo.
-echo pause
-echo.
-echo REM Check admin rights
-echo net session ^>nul 2^>^&1
-echo if %%errorLevel%% neq 0 (
-echo     echo Error: Administrator rights required!
-echo     echo Please right-click and select "Run as administrator"
-echo     pause
-echo     exit /b 1
-echo ^)
-echo.
-echo echo [1/3] Checking configuration...
-echo if not exist .env (
-echo     echo Creating .env from template...
-echo     copy .env.example .env
-echo     echo Please edit .env with your GitHub settings before running.
-echo     notepad .env
-echo     pause
-echo     exit /b 0
-echo ^)
-echo.
-echo echo [2/3] Installing service...
-echo AGitFileSync.exe --install
-echo.
-echo echo [3/3] Starting service...
-echo net start AGitFileSyncService
-echo.
-echo echo ========================================
-echo echo Installation complete!
-echo echo ========================================
-echo echo.
-echo echo Service name: AGitFileSyncService
-echo echo.
-echo echo Commands:
-echo echo   - Start:   net start AGitFileSyncService
-echo echo   - Stop:    net stop AGitFileSyncService
-echo echo   - Status:  sc query AGitFileSyncService
-echo echo.
-echo pause
-) > release\INSTALL.bat
-
-echo.
 echo ========================================
 echo Release package created!
 echo ========================================
@@ -108,6 +97,6 @@ echo.
 echo To distribute:
 echo   1. Zip the release\ folder
 echo   2. Share the zip file
-echo   3. Users run INSTALL.bat as Administrator
+echo   3. Users run setup.bat as Administrator
 echo.
 pause
