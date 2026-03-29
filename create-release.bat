@@ -6,6 +6,7 @@ echo.
 
 REM Set pkg cache path for faster builds
 set PKG_CACHE_PATH=C:\pkg-cache
+set PKG_VERSION=v3.5
 if not exist %PKG_CACHE_PATH% (
     mkdir %PKG_CACHE_PATH%
     echo Created cache directory: %PKG_CACHE_PATH%
@@ -30,31 +31,28 @@ if %errorLevel% neq 0 (
 echo.
 
 echo [2/5] Checking Node.js binaries for pkg...
-set NODE_BINARY=fetched-v18.15.0-win-x64
-set DOWNLOAD_URL=https://github.com/vercel/pkg-fetch/releases/download/v3.5/node-v18.15.0-win-x64
+set TARGET_BINARY=fetched-v20.18.2-win-x64
+set PKG_CACHE_SUBDIR=%PKG_CACHE_PATH%\%PKG_VERSION%
 
-if exist %PKG_CACHE_PATH%\%NODE_BINARY% (
-    echo Binary found in cache. Build will be fast!
-) else if exist .\pkg-cache\%NODE_BINARY% (
-    echo Found local binary, copying to cache...
-    if not exist %PKG_CACHE_PATH% mkdir %PKG_CACHE_PATH%
-    copy .\pkg-cache\%NODE_BINARY% %PKG_CACHE_PATH%\%NODE_BINARY% >nul
-    echo Local binary copied to cache.
+if not exist %PKG_CACHE_SUBDIR% mkdir %PKG_CACHE_SUBDIR%
+
+REM Check if binary exists in pkg cache subdir
+if exist %PKG_CACHE_SUBDIR%\%TARGET_BINARY% (
+    echo Binary found in pkg cache: %PKG_CACHE_SUBDIR%\%TARGET_BINARY%
+    echo Build will be fast!
+) else if exist %PKG_CACHE_PATH%\%TARGET_BINARY% (
+    echo Found binary in root cache, copying to pkg subfolder...
+    copy %PKG_CACHE_PATH%\%TARGET_BINARY% %PKG_CACHE_SUBDIR%\%TARGET_BINARY% >nul
+    echo Binary prepared for pkg.
 ) else (
-    echo Binary not found. Downloading from GitHub... (one-time only)
-    echo URL: %DOWNLOAD_URL%
+    echo Binary not found. Will download during build...
+    echo pkg will automatically download the required Node.js binary
     echo This may take 5-10 minutes depending on your internet speed.
     echo.
-    powershell -Command "& {$url='%DOWNLOAD_URL%'; $out='%PKG_CACHE_PATH%\%NODE_BINARY%'; try { Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing; Write-Host 'Download complete!'} catch { Write-Host 'Download failed: ' $_.Exception.Message; exit 1 }}"
-    if %errorLevel% neq 0 (
-        echo.
-        echo Error: Download failed!
-        echo Please manually download from: %DOWNLOAD_URL%
-        echo And place it at: %PKG_CACHE_PATH%\%NODE_BINARY%
-        pause
-        exit /b 1
-    )
-    echo Download complete!
+    echo To manually download, get it from:
+    echo https://github.com/yao-pkg/pkg-fetch/releases/download/%PKG_VERSION%/node-v20.18.2-win-x64
+    echo And place it at: %PKG_CACHE_SUBDIR%\%TARGET_BINARY%
+    echo.
 )
 echo.
 
@@ -63,7 +61,7 @@ if exist release rmdir /s /q release
 mkdir release
 
 REM Build with pkg (uses cache for fast builds)
-npx pkg . --targets node18.15.0-win-x64 --output release/AGitFileSync.exe
+npx pkg . --output release/AGitFileSync.exe
 
 if %errorLevel% neq 0 (
     echo Error: Build failed!
