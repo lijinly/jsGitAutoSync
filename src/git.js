@@ -43,8 +43,8 @@ class GitSync {
       await this.git.raw(['config', 'user.email', this.userEmail]);
       logger.info(`仓库克隆成功: ${this.syncDir}`);
     } catch (err) {
-      logger.error(`克隆失败: ${err.message}`);
-      throw err;
+      logger.warn(`克隆失败: ${err.message} - 将使用本地模式运行`);
+      // 不抛异常，继续运行
     }
   }
 
@@ -62,7 +62,7 @@ class GitSync {
       const log = await git.log([`HEAD..origin/${this.branch}`]);
       return log.total > 0;
     } catch (err) {
-      logger.error(`检查远程变更失败: ${err.message}`);
+      logger.warn(`检查远程变更失败: ${err.message} - 跳过本次检查`);
       return false;
     }
   }
@@ -99,7 +99,7 @@ class GitSync {
       logger.info('Pull 成功');
       return true;
     } catch (err) {
-      logger.error(`Pull 失败: ${err.message}`);
+      logger.warn(`Pull 失败: ${err.message} - 将在下次重试`);
       if (err.message.includes('CONFLICT')) {
         await this.handleConflict(err);
       }
@@ -137,7 +137,7 @@ class GitSync {
       logger.info('Push 成功');
       return true;
     } catch (err) {
-      logger.error(`Commit/Push 失败: ${err.message}`);
+      logger.warn(`Commit/Push 失败: ${err.message} - 将在下次重试`);
       if (err.message.includes('CONFLICT')) {
         await this.handleConflict(err);
       }

@@ -2,18 +2,26 @@ const path = require('path');
 const { Service } = require('node-windows');
 const logger = require('./logger');
 
-const SVC_NAME = 'GitFileSync';
+const SVC_NAME = 'AGitFileSyncService';
 const SVC_DESC = '多PC端文件同步服务 - 基于GitHub仓库';
 
 // 获取项目根目录（installer.js 在 src/ 下）
 const projectRoot = path.resolve(__dirname, '..');
 
+// 检测是否在 pkg 打包的可执行文件中运行
+const isPackaged = process.pkg !== undefined;
+
+// 根据运行环境设置脚本路径
+const scriptPath = isPackaged 
+  ? process.execPath  // 打包后：使用可执行文件本身
+  : path.join(projectRoot, 'src', 'index.js');  // 开发环境：使用源码
+
 const svcConfig = {
   name: SVC_NAME,
   description: SVC_DESC,
-  script: path.join(projectRoot, 'src', 'index.js'),
+  script: scriptPath,
   nodeOptions: [],
-  workingDirectory: projectRoot,
+  workingDirectory: isPackaged ? path.dirname(process.execPath) : projectRoot,
   env: [
     { name: 'NODE_ENV', value: 'production' },
   ],
@@ -77,9 +85,11 @@ if (args.includes('--install')) {
   installService();
 } else if (args.includes('--uninstall')) {
   uninstallService();
-} else {
+} else if (require.main === module) {
   console.log('用法:');
   console.log('  安装服务: node src/installer.js --install');
   console.log('  卸载服务: node src/installer.js --uninstall');
   process.exit(0);
 }
+
+module.exports = { installService, uninstallService };

@@ -92,13 +92,11 @@ const logger = require('./logger');
 const GitSync = require('./git');
 const FileWatcher = require('./watcher');
 const SyncScheduler = require('./syncer');
-const TrayManager = require('./tray');
 
 // 核心组件
 const gitSync = new GitSync(config);
 const watcher = new FileWatcher(gitSync, config.SYNC_DIR);
 const syncer = new SyncScheduler(gitSync, config.PULL_INTERVAL);
-const tray = new TrayManager();
 
 let isRunning = false;
 
@@ -141,62 +139,33 @@ function stopSync() {
   watcher.stop();
   syncer.stop();
   logger.info('⏸️ 同步已停止');
-  // Note: tray.stopSync() is called from the tray click handler, not here
-  // to avoid circular calls
 }
 
-function uninstallService() {
-  logger.info('开始卸载服务...');
-  const { exec } = require('child_process');
-  exec('npm run uninstall:service', { cwd: process.cwd() }, (error, stdout, stderr) => {
-    if (error) {
-      logger.error(`卸载服务失败: ${error.message}`);
-      return;
-    }
-    logger.info('服务卸载命令已执行');
-    if (stdout) logger.info(stdout);
-    if (stderr) logger.error(stderr);
-  });
+// 处理命令行参数
+const args = process.argv.slice(2);
+if (args.includes('--install')) {
+  // 安装服务模式
+  const { installService } = require('./installer');
+  installService();
+  return;
+} else if (args.includes('--uninstall')) {
+  // 卸载服务模式
+  const { uninstallService } = require('./installer');
+  uninstallService();
+  return;
 }
 
-// 启动托盘
-tray.create({
-  onStart: () => {
-    startSync();
-  },
-  onStop: () => {
-    stopSync();
-  },
-  onUninstall: () => {
-    uninstallService();
-  },
-  onQuit: () => {
-    stopSync();
-    logger.info('程序退出');
-    setTimeout(() => process.exit(0), 500);
-  },
-});
-
-// 自动启动同步 - 立即启动并更新托盘为绿色
-startSync().then(() => {
-  // Wait a bit for tray to be ready, then update to running state
-  setTimeout(() => {
-    if (isRunning && tray.systray) {
-      tray.startSync();
-    }
-  }, 1000);
-});
+// 自动启动同步
+startSync();
 
 // 优雅退出
 process.on('SIGINT', () => {
   stopSync();
-  tray.shutdown();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   stopSync();
-  tray.shutdown();
   process.exit(0);
 });
 

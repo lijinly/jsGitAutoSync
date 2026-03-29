@@ -1,11 +1,10 @@
 {
   "name": "git-file-sync",
   "version": "1.0.0",
-  "description": "多 PC 端文件同步工具 - 基于 GitHub 仓库，PAT 认证，Windows 服务 + 系统托盘",
+  "description": "多 PC 端文件同步工具 - 基于 GitHub 仓库，PAT 认证，Windows 服务",
   "main": "src/index.js",
   "bin": "src/index.js",
   "pkg": {
-    "assets": "src/**/*.png",
     "targets": [
       "node18-win-x64"
     ],
@@ -21,7 +20,6 @@
     "dotenv": "^16.4.5",
     "node-windows": "^1.0.0-beta.8",
     "simple-git": "^3.27.0",
-    "systray2": "^2.0.1",
     "winston": "^3.13.0"
   },
   "engines": {
