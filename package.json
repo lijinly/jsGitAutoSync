@@ -1,8 +1,16 @@
 {
   "name": "git-file-sync",
   "version": "1.0.0",
-  "description": "多PC端文件同步工具 - 基于GitHub仓库，PAT认证，Windows服务+系统托盘",
+  "description": "多 PC 端文件同步工具 - 基于 GitHub 仓库，PAT 认证，Windows 服务 + 系统托盘",
   "main": "src/index.js",
+  "bin": "src/index.js",
+  "pkg": {
+    "assets": "src/**/*.png",
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "./release"
+  },
   "scripts": {
     "start": "node src/index.js",
     "install:service": "node src/installer.js --install",
@@ -19,5 +27,8 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
 }

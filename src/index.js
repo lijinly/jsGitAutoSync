@@ -1,5 +1,64 @@
 const path = require('path');
 const dotenv = require('dotenv');
+const fs = require('fs');
+const crypto = require('crypto');
+
+// 单实例检查 - 使用锁文件
+const lockFilePath = path.join(require('os').tmpdir(), 'GitFileSync.lock');
+const lockId = crypto.randomBytes(16).toString('hex');
+
+function acquireLock() {
+  try {
+    fs.writeFileSync(lockFilePath, lockId, { flag: 'wx' });
+    
+    // 注册退出时清理锁文件
+    process.on('exit', releaseLock);
+    process.on('SIGINT', () => {
+      releaseLock();
+      process.exit(0);
+    });
+    process.on('SIGTERM', () => {
+      releaseLock();
+      process.exit(0);
+    });
+    process.on('uncaughtException', () => {
+      releaseLock();
+      process.exit(1);
+    });
+    
+    return true;
+  } catch (err) {
+    if (err.code === 'EEXIST') {
+      // 锁文件已存在，检查进程是否仍在运行
+      try {
+        const existingLockId = fs.readFileSync(lockFilePath, 'utf8');
+        // 简单的检查：如果锁文件存在，认为已有实例运行
+        return false;
+      } catch (readErr) {
+        // 读取失败，尝试获取锁
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+function releaseLock() {
+  try {
+    if (fs.existsSync(lockFilePath)) {
+      fs.unlinkSync(lockFilePath);
+    }
+  } catch (err) {
+    // 忽略清理错误
+  }
+}
+
+// 检查单实例
+if (!acquireLock()) {
+  console.log('❌ GitFileSync 已在运行中，无法启动第二个实例');
+  console.log('如果确定没有运行，请删除锁文件：' + lockFilePath);
+  process.exit(0);
+}
 
 // 加载 .env 配置
 const envPath = path.resolve(process.cwd(), '.env');
@@ -44,11 +103,7 @@ const tray = new TrayManager();
 let isRunning = false;
 
 async function startSync() {
-  if (isRunning) {
-    // 如果已在运行，停止
-    stopSync();
-    return;
-  }
+  if (isRunning) return;
 
   isRunning = true;
   logger.info(`===== GitFileSync 启动 [${config.PC_NAME}] =====`);
@@ -73,24 +128,45 @@ async function startSync() {
   } catch (err) {
     logger.error(`启动失败: ${err.message}`);
     isRunning = false;
+    // Update tray to stopped state on error
+    if (tray.isRunning) {
+      tray.stopSync();
+    }
   }
 }
 
 function stopSync() {
+  if (!isRunning) return;
   isRunning = false;
   watcher.stop();
   syncer.stop();
   logger.info('⏸️ 同步已停止');
 }
 
+function uninstallService() {
+  logger.info('开始卸载服务...');
+  const { exec } = require('child_process');
+  exec('npm run uninstall:service', { cwd: process.cwd() }, (error, stdout, stderr) => {
+    if (error) {
+      logger.error(`卸载服务失败: ${error.message}`);
+      return;
+    }
+    logger.info('服务卸载命令已执行');
+    if (stdout) logger.info(stdout);
+    if (stderr) logger.error(stderr);
+  });
+}
+
 // 启动托盘
 tray.create({
   onStart: () => {
-    if (isRunning) {
-      stopSync();
-    } else {
-      startSync();
-    }
+    startSync();
+  },
+  onStop: () => {
+    stopSync();
+  },
+  onUninstall: () => {
+    uninstallService();
   },
   onQuit: () => {
     stopSync();
@@ -100,7 +176,12 @@ tray.create({
 });
 
 // 自动启动同步
-startSync();
+startSync().then(() => {
+  // After auto-start, update tray to running state
+  if (isRunning && tray.systray) {
+    tray.startSync();
+  }
+});
 
 // 优雅退出
 process.on('SIGINT', () => {
